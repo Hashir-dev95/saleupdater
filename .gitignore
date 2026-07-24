@@ -41,3 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
+#ignored files 
+eas.json
+app.ts
