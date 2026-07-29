@@ -15,10 +15,13 @@
       }
     },
     "production": {
-      "distribution": "internal",
       "autoIncrement": true,
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://excel-server-is2r.onrender.com",
+        "EXPO_PUBLIC_ENV": "production"
       }
     }
   },
