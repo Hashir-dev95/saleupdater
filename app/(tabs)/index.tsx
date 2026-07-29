@@ -508,6 +508,66 @@ export default function HomeScreen() {
     }
   };
 
+  const handleViewCurrentWorkbook = async () => {
+    try {
+      const saved = await getPersistedWorkbook();
+      if (!saved || !saved.uri) {
+        Alert.alert(
+          "Workbook Not Found",
+          "Workbook not found.\nPlease select another workbook."
+        );
+        return;
+      }
+
+      const fileInfo = await FileSystem.getInfoAsync(saved.uri);
+      if (!fileInfo.exists) {
+        Alert.alert(
+          "Workbook Not Found",
+          "Workbook not found.\nPlease select another workbook."
+        );
+        return;
+      }
+
+      await openWorkbook(saved.uri);
+    } catch (error) {
+      console.error("[View Current Workbook] Error", error);
+      Alert.alert(
+        "Workbook Not Found",
+        "Workbook not found.\nPlease select another workbook."
+      );
+    }
+  };
+
+  const handleShareCurrentWorkbook = async () => {
+    try {
+      const saved = await getPersistedWorkbook();
+      if (!saved || !saved.uri) {
+        Alert.alert(
+          "Workbook Not Found",
+          "Workbook not found.\nPlease select another workbook."
+        );
+        return;
+      }
+
+      const fileInfo = await FileSystem.getInfoAsync(saved.uri);
+      if (!fileInfo.exists) {
+        Alert.alert(
+          "Workbook Not Found",
+          "Workbook not found.\nPlease select another workbook."
+        );
+        return;
+      }
+
+      await shareWorkbook(saved.uri, saved.name || "Workbook.xlsx");
+    } catch (error) {
+      console.error("[Share Current Workbook] Error", error);
+      Alert.alert(
+        "Workbook Not Found",
+        "Workbook not found.\nPlease select another workbook."
+      );
+    }
+  };
+
   const handleDownloadWorkbook = async () => {
     const uri =
       state.updateResult?.outputUri ??
@@ -696,24 +756,27 @@ export default function HomeScreen() {
                     onPress={handleContinueWorkbook}
                     disabled={isAnyLoading}
                   />
-                  <SecondaryButton
-                    title="Change Workbook"
-                    onPress={handleChangeWorkbook}
-                    disabled={isAnyLoading}
-                  />
                 </View>
               </View>
             )}
 
-            {!pendingReminder && (
-              <View style={styles.workbookButtons}>
-                <SecondaryButton
-                  title="Change Workbook"
-                  onPress={handleChangeWorkbook}
-                  disabled={isAnyLoading}
-                />
-              </View>
-            )}
+            <View style={styles.workbookButtons}>
+              <PrimaryButton
+                title="View Workbook"
+                onPress={handleViewCurrentWorkbook}
+                disabled={isAnyLoading}
+              />
+              <SecondaryButton
+                title="Share Workbook"
+                onPress={handleShareCurrentWorkbook}
+                disabled={isAnyLoading}
+              />
+              <SecondaryButton
+                title="Change Workbook"
+                onPress={handleChangeWorkbook}
+                disabled={isAnyLoading}
+              />
+            </View>
           </View>
         ) : (
           <PrimaryButton
