@@ -1,13 +1,14 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   StyleSheet,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as FileSystem from "expo-file-system/legacy";
 
 import * as IntentLauncherModule from "expo-intent-launcher";
 import * as SharingModule from "expo-sharing";
@@ -26,8 +27,8 @@ import {
 } from "@/constants/app";
 
 import {
-  updateExcelWorkbook,
   logWorkbookDetails,
+  updateExcelWorkbook,
 } from "@/services/excelService";
 
 import {
@@ -82,7 +83,7 @@ async function getPersistedWorkbook() {
     const name = await AsyncStorage.getItem(STORAGE_KEY_NAME);
     const confStr = await AsyncStorage.getItem(STORAGE_KEY_CONFIRMED_TS);
     const updStr = await AsyncStorage.getItem(STORAGE_KEY_UPDATED_TS);
-    
+
     return uri && name ? {
       uri,
       name,
@@ -715,7 +716,7 @@ export default function HomeScreen() {
       }));
     }
   };
-    return (
+  return (
     <AppShell title={APP_TITLE} subtitle={APP_SUBTITLE}>
       <ActionCard>
         {isStorageLoading ? (
@@ -792,24 +793,44 @@ export default function HomeScreen() {
           disabled={isAnyLoading}
         />
 
+
         {/* Form fields are fully accessible when workbook is loaded (even during reminder) */}
         {!isStorageLoading && !workbookNotFound && state.selectedFile && (
           <>
-            <TextInput
-              style={styles.textArea}
-              multiline
-              numberOfLines={10}
-              value={state.pastedMessage}
-              onChangeText={(value) =>
-                setState((current) => ({
-                  ...current,
-                  pastedMessage: value,
-                }))
-              }
-              placeholder="Paste WhatsApp Message Here"
-              textAlignVertical="top"
-              editable={!isAnyLoading}
-            />
+            <View style={styles.messageContainer}>
+
+              <TextInput
+                style={styles.textArea}
+                multiline
+                numberOfLines={10}
+                value={state.pastedMessage}
+                onChangeText={(value) =>
+                  setState((current) => ({
+                    ...current,
+                    pastedMessage: value,
+                  }))
+                }
+                placeholder="Paste WhatsApp Message Here"
+                placeholderTextColor="#000000ff"
+                textAlignVertical="top"
+                editable={!isAnyLoading}
+              />
+
+              {state.pastedMessage.length > 0 && (
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() =>
+                    setState((current) => ({
+                      ...current,
+                      pastedMessage: "",
+                    }))
+                  }
+                >
+                  <Text style={styles.clearButtonText}>✕</Text>
+                </TouchableOpacity>
+              )}
+
+            </View>
 
             <SecondaryButton
               title="Parse Message"
@@ -898,15 +919,35 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 12,
     backgroundColor: "#f9fbff",
-    marginBottom: 12,
     color: "#162033",
   },
+  messageContainer: {
+    position: "relative",
+    marginBottom: 12,
+  },
 
+  clearButton: {
+    position: "absolute",
+    top: 15,
+    right: 15,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: "#e5e7eb",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  clearButtonText: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: "#000",
+  },
   sectionTitle: {
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: "800",
     color: "#162033",
-    marginBottom: 10,
+    marginBottom: 2,
   },
 
   loadingText: {
