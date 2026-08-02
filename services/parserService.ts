@@ -1,8 +1,8 @@
 import { ParsedSalesMessage } from '@/types/sales';
 
-const DATE_PATTERN = /\b(\d{1,4}[./-]\d{1,2}[./-]\d{2,4})\b/;
-const DSF_PATTERN = /(?:^|\n)\s*(?:d\s*\.?\s*s\s*\.?\s*f|dsf)\s*(?:name)?\s*[:=-]\s*([^\r\n]+)/i;
-const TODAY_VALUE_PATTERN = /today(?:'s)?\s*(?:valunne|value|sales?|v)\s*[:=-]\s*([0-9,\s]+)/i;
+const DATE_PATTERN = /\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/i;
+const DSF_PATTERN = /(?:^|\n)\s*(?:d\s*\.?\s*s\s*\.?\s*f|dsf)\s*(?:name)?\s*(?::|=|-|\.{2,})\s*([^\r\n]+)/i;
+const TODAY_VALUE_PATTERN = /today(?:'s)?\s*(?:valunne|value|sales?|v)\s*(?::|=|-|\.{2,})\s*([0-9,\s]+)/i;
 
 export function parseSalesMessage(message: string): ParsedSalesMessage {
   // Normalize the WhatsApp text before applying the extraction rules.
