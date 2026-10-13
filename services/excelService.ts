@@ -8,6 +8,7 @@ if (typeof global.Buffer === "undefined") {
 
 import { SERVER_URL } from "@/constants/app";
 import { ExcelUpdateResult, ParsedSalesMessage } from "@/types/sales";
+import { ensureLocalUri } from './fileService';
 
 export async function logWorkbookDetails(uri: string, label: string) {
   try {
@@ -71,14 +72,7 @@ export async function updateExcelWorkbook(params: {
 }): Promise<ExcelUpdateResult> {
   const { onStatus } = params;
 
-  let localUri = params.uri;
-  if (localUri.startsWith("http://") || localUri.startsWith("https://")) {
-    onStatus?.("Fetching latest workbook...");
-    console.log("[excel] Fetching remote file before upload:", localUri);
-    const cacheUri = FileSystem.cacheDirectory + params.fileName;
-    const downloadResult = await FileSystem.downloadAsync(localUri, cacheUri);
-    localUri = downloadResult.uri;
-  }
+  const localUri = await ensureLocalUri(params.uri);
 
   // Step 1 — Log details before uploading
   await logWorkbookDetails(localUri, "Pre-upload");
@@ -120,6 +114,7 @@ export async function updateExcelWorkbook(params: {
 
   // Resolve the download URL — prefer downloadUrl, fall back to output path
   const result = json.result as Record<string, unknown>;
+  if (!result || typeof result !== 'object') throw new Error('Server returned invalid workbook information.');
 
   let downloadUrl: string =
     typeof result.downloadUrl === "string"
@@ -136,8 +131,9 @@ export async function updateExcelWorkbook(params: {
     downloadUrl = downloadUrl.replace(/^http:\/\//i, "https://");
   }
 
-  const filename: string =
-    downloadUrl.split("/").pop() ?? "updated.xlsx";
+  if (downloadUrl.startsWith('/')) downloadUrl = `${SERVER_URL}${downloadUrl}`;
+  if (!/^https?:\/\//i.test(downloadUrl)) throw new Error('Server returned an invalid download URL.');
+  const filename = decodeURIComponent(downloadUrl.split(/[?#]/)[0].split('/').pop() || 'updated.xlsx');
 
   onStatus?.("Completed");
 

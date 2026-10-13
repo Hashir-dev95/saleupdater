@@ -4,7 +4,7 @@
     "slug": "SalesUpdater",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Icon.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "salesupdater",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,8 +13,9 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-    },
+        "backgroundColor": "#0f172a",
+        "foregroundImage": "./assets/images/icon.png"
+      },
       "predictiveBackGestureEnabled": false,
       "package": "com.whomi.salesUpdater"
     },
