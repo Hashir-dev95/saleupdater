@@ -98,8 +98,8 @@ test('rapid taps produce only one upload and success follows persistence', async
   release();
   await ui.settle();
   assert.equal(ui.alert().title, 'Excel updated!');
-  assert.equal(ui.alert().confirmLabel, 'Open workbook');
-  assert.equal(ui.alert().cancelLabel, 'Done');
+  assert.equal(ui.alert().confirmLabel, 'OK');
+  assert.equal(ui.alert().cancelLabel, undefined);
   assert.equal(JSON.parse(f.values.get(RECORD)).uri, ui.state().selectedFile.uri);
   assert.equal(f.files.has(ui.state().selectedFile.uri), true);
 });

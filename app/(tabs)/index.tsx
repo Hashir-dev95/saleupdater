@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { ActionCard, AppShell, PrimaryButton, SecondaryButton, WorkflowStep } from '@/components/app-shell';
 import { SweetAlert, SweetAlertOptions } from '@/components/sweet-alert';
 import { APP_SUBTITLE, APP_TITLE, SERVER_URL } from '@/constants/app';
+import { AppThemeColors } from '@/constants/app-theme';
+import { useAppTheme } from '@/hooks/use-app-theme';
 import { updateExcelWorkbook } from '@/services/excelService';
 import { downloadWorkbook, openWorkbook, pickExcelFile, shareWorkbook } from '@/services/fileService';
 import { parseSalesMessage } from '@/services/parserService';
@@ -24,6 +26,8 @@ export default function HomeScreen() {
   const [storageLoading, setStorageLoading] = useState(true);
   const [pendingReminder, setPendingReminder] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
+  const { colors } = useAppTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const wide = width >= 900;
   const disabled = state.isLoading || storageLoading;
@@ -105,7 +109,7 @@ export default function HomeScreen() {
       const replacement = await replacePersistedWorkbook({ uri: result.outputUri, name: result.fileName, updatedTimestamp: Date.now() });
       change({ selectedFile: replacement, updateResult: { ...result, outputUri: replacement.uri }, statusMessage: 'Workbook updated and saved.', successMessage: 'Excel updated successfully.' });
       setUpdatedAt(replacement.updatedTimestamp);
-      setAlert({ kind: 'success', title: 'Excel updated!', message: 'Your updated workbook is saved and ready to use.', confirmLabel: 'Open workbook', cancelLabel: 'Done', onConfirm: () => { void runAction('Could not open workbook', () => openWorkbook(replacement.uri)); } });
+      setAlert({ kind: 'success', title: 'Excel updated!', message: 'Your updated workbook is saved and ready to use.', confirmLabel: 'OK' });
     });
   }
   async function fileAction(action: 'open' | 'share' | 'export') {
@@ -160,7 +164,7 @@ export default function HomeScreen() {
           </ActionCard>
           <ActionCard>
             <WorkflowStep number={2} title="Paste and parse sales" description="Paste your WhatsApp message, then review the extracted values." />
-            <TextInput accessibilityLabel="Sales message" style={styles.textArea} multiline value={state.pastedMessage} onChangeText={editMessage} placeholder="Paste WhatsApp sales message here" placeholderTextColor="#64748b" textAlignVertical="top" editable={!disabled} />
+            <TextInput accessibilityLabel="Sales message" style={styles.textArea} multiline value={state.pastedMessage} onChangeText={editMessage} placeholder="Paste WhatsApp sales message here" placeholderTextColor={colors.textMuted} textAlignVertical="top" editable={!disabled} />
             <View style={styles.fileActions}>
               <View style={styles.action}><PrimaryButton title="Parse message" disabled={disabled || !state.pastedMessage.trim()} onPress={parseMessage} /></View>
               <View style={styles.action}><SecondaryButton title="Clear message" disabled={disabled || !state.pastedMessage} onPress={() => editMessage('')} /></View>
@@ -187,13 +191,13 @@ export default function HomeScreen() {
   </>;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: AppThemeColors) => StyleSheet.create({
   workflow: { gap: 20 }, workflowWide: { flexDirection: 'row', alignItems: 'flex-start' }, main: { flex: 1, minWidth: 0 }, review: { minWidth: 0 }, reviewWide: { width: 340 },
-  fileName: { fontSize: 19, fontWeight: '700', color: '#0f172a', marginBottom: 8 },
-  muted: { fontSize: 14, color: '#64748b', lineHeight: 22, marginBottom: 12 },
-  notice: { color: '#854d0e', lineHeight: 22, marginBottom: 14 }, reminder: { backgroundColor: '#fffbeb', padding: 12, borderRadius: 12 },
+  fileName: { fontSize: 19, fontWeight: '700', color: colors.text, marginBottom: 8 },
+  muted: { fontSize: 14, color: colors.textMuted, lineHeight: 22, marginBottom: 12 },
+  notice: { color: colors.warningText, lineHeight: 22, marginBottom: 14 }, reminder: { backgroundColor: colors.warningBackground, padding: 12, borderRadius: 12 },
   fileActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 }, action: { flexGrow: 1, flexBasis: 100 },
-  textArea: { minHeight: 200, padding: 14, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 14, color: '#0f172a', backgroundColor: '#f8fafc', fontSize: 16, lineHeight: 24 },
-  valueRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 6 }, value: { fontSize: 16, color: '#0f172a', fontWeight: '700', flexShrink: 1 },
-  status: { color: '#475569', lineHeight: 22, marginVertical: 12 }, error: { color: '#b91c1c', marginBottom: 12 }, success: { color: '#047857', marginBottom: 12 },
+  textArea: { minHeight: 200, padding: 14, borderWidth: 1, borderColor: colors.border, borderRadius: 14, color: colors.text, backgroundColor: colors.input, fontSize: 16, lineHeight: 24 },
+  valueRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12, marginBottom: 6 }, value: { fontSize: 16, color: colors.text, fontWeight: '700', flexShrink: 1 },
+  status: { color: colors.textMuted, lineHeight: 22, marginVertical: 12 }, error: { color: colors.error, marginBottom: 12 }, success: { color: colors.success, marginBottom: 12 },
 });

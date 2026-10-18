@@ -87,12 +87,18 @@ function screen(f) {
     useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = initial; return [slots[i], value => { slots[i] = typeof value === 'function' ? value(slots[i]) : value; }]; },
     useRef(initial) { const i = cursor++; if (!(i in slots)) slots[i] = { current: initial }; return slots[i]; },
     useEffect(effect) { const i = cursor++; if (!(i in slots)) { slots[i] = true; effects.push(effect); } },
+    useMemo(factory) { return factory(); },
   };
   const jsx = (type, props) => ({ type, props });
   const load = loader({ ...f.mocks, react,
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     '@/components/app-shell': Object.fromEntries(['ActionCard', 'AppShell', 'PrimaryButton', 'SecondaryButton', 'WorkflowStep'].map(name => [name, name])),
     '@/components/sweet-alert': { SweetAlert: 'SweetAlert' },
+    '@/hooks/use-app-theme': { useAppTheme: () => ({ colors: {
+      background: '#fff', surface: '#fff', surfaceMuted: '#f8fafc', text: '#0f172a', textMuted: '#64748b', border: '#cbd5e1',
+      primary: '#047857', primaryPressed: '#065f46', primaryText: '#fff', secondary: '#ecfdf5', secondaryText: '#065f46', badge: '#d1fae5',
+      input: '#f8fafc', warningBackground: '#fffbeb', warningText: '#854d0e', error: '#b91c1c', success: '#047857', overlay: 'rgba(0,0,0,.6)',
+    } }) },
   });
   const Home = load('app/(tabs)/index.tsx').default;
   function render() { cursor = 0; return Home(); }
