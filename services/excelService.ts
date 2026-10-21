@@ -1,3 +1,5 @@
+import { message, type Message } from '@/localization';
+import { AppError } from '@/localization/errors';
 import * as FileSystem from "expo-file-system/legacy";
 import * as XLSX from "xlsx";
 import { Buffer } from "buffer";
@@ -61,14 +63,14 @@ export async function logWorkbookDetails(uri: string, label: string) {
 }
 
 export async function previewWorkbookChange() {
-  throw new Error("Preview is now handled by the server.");
+  throw new AppError('errors.previewServer');
 }
 
 export async function updateExcelWorkbook(params: {
   uri: string;
   fileName: string;
   parsed: ParsedSalesMessage;
-  onStatus?: (step: string) => void;
+  onStatus?: (step: Message) => void;
 }): Promise<ExcelUpdateResult> {
   const { onStatus } = params;
 
@@ -78,7 +80,7 @@ export async function updateExcelWorkbook(params: {
   await logWorkbookDetails(localUri, "Pre-upload");
 
   // Step 2 — Upload
-  onStatus?.("Uploading...");
+  onStatus?.(message('status.uploading'));
   console.log("[excel] Uploading Excel...", localUri);
 
   const response = await FileSystem.uploadAsync(
@@ -100,21 +102,21 @@ export async function updateExcelWorkbook(params: {
   console.log("[excel] Upload body:", response.body);
 
   // Step 2 — Server has processed the file
-  onStatus?.("Updating Excel...");
+  onStatus?.(message('status.updating'));
 
   if (response.status !== 200) {
-    throw new Error(response.body || `Server error: ${response.status}`);
+    throw new AppError('errors.serverStatus', { status: response.status });
   }
 
   const json = JSON.parse(response.body);
 
   if (!json.success) {
-    throw new Error(json.message || "Server returned an error.");
+    throw new AppError('errors.generic');
   }
 
   // Resolve the download URL — prefer downloadUrl, fall back to output path
   const result = json.result as Record<string, unknown>;
-  if (!result || typeof result !== 'object') throw new Error('Server returned invalid workbook information.');
+  if (!result || typeof result !== 'object') throw new AppError('errors.invalidServerWorkbook');
 
   let downloadUrl: string =
     typeof result.downloadUrl === "string"
@@ -132,10 +134,10 @@ export async function updateExcelWorkbook(params: {
   }
 
   if (downloadUrl.startsWith('/')) downloadUrl = `${SERVER_URL}${downloadUrl}`;
-  if (!/^https?:\/\//i.test(downloadUrl)) throw new Error('Server returned an invalid download URL.');
+  if (!/^https?:\/\//i.test(downloadUrl)) throw new AppError('errors.invalidDownloadUrl');
   const filename = decodeURIComponent(downloadUrl.split(/[?#]/)[0].split('/').pop() || 'updated.xlsx');
 
-  onStatus?.("Completed");
+  onStatus?.(message('status.completed'));
 
   // Return the remote download URL as outputUri.
   // fileService will cache it on demand when the user taps Open, Share, or Download.

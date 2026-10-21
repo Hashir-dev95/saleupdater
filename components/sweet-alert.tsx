@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useRef } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Modal, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { LocalizedText as Text } from '@/components/localized-text';
+import { useLocalization } from '@/hooks/use-localization';
+import type { Message } from '@/localization';
 
 import { AppThemeColors } from '@/constants/app-theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
 
 export interface SweetAlertOptions {
   kind: 'success' | 'error' | 'warning' | 'confirmation';
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
+  title: Message;
+  message: Message;
+  confirmLabel?: Message;
+  cancelLabel?: Message;
   onConfirm?: () => void;
 }
 
@@ -18,6 +21,7 @@ const symbols = { success: '\u2713', error: '!', warning: '!', confirmation: '?'
 
 export function SweetAlert({ alert, onClose }: { alert: SweetAlertOptions | null; onClose: () => void }) {
   const { colors } = useAppTheme();
+  const { resolve, t } = useLocalization();
   const { width, height } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const iconScale = useRef(new Animated.Value(0.35)).current;
@@ -43,14 +47,14 @@ export function SweetAlert({ alert, onClose }: { alert: SweetAlertOptions | null
             <Animated.View style={[styles.symbolCircle, { borderColor: accentColors[alert.kind], transform: [{ scale: iconScale }], opacity: iconOpacity }]}>
               <Text style={[styles.symbol, { color: accentColors[alert.kind] }]} accessibilityElementsHidden>{symbols[alert.kind]}</Text>
             </Animated.View>
-            <Text accessibilityRole="header" style={styles.title}>{alert.title}</Text>
-            <Text style={styles.message}>{alert.message}</Text>
+            <Text accessibilityRole="header" style={styles.title}>{resolve(alert.title)}</Text>
+            <Text style={styles.message}>{resolve(alert.message)}</Text>
             <View style={styles.actions}>
               {alert.cancelLabel && <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.secondary, pressed && styles.pressed]}>
-                <Text style={styles.secondaryText}>{alert.cancelLabel}</Text>
+                <Text style={styles.secondaryText}>{resolve(alert.cancelLabel)}</Text>
               </Pressable>}
               <Pressable accessibilityRole="button" onPress={() => { onClose(); alert.onConfirm?.(); }} style={({ pressed }) => [styles.primary, pressed && styles.pressed]}>
-                <Text style={styles.primaryText}>{alert.confirmLabel ?? 'OK'}</Text>
+                <Text style={styles.primaryText}>{alert.confirmLabel ? resolve(alert.confirmLabel) : t('common.ok')}</Text>
               </Pressable>
             </View>
           </ScrollView>

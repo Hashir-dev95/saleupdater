@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import { LocalizedText as Text } from '@/components/localized-text';
 import { ActionCard, AppShell, PrimaryButton, SecondaryButton, WorkflowStep } from '@/components/app-shell';
 import { SweetAlert, SweetAlertOptions } from '@/components/sweet-alert';
-import { APP_SUBTITLE, APP_TITLE, SERVER_URL } from '@/constants/app';
+import { APP_TITLE, SERVER_URL } from '@/constants/app';
 import { AppThemeColors } from '@/constants/app-theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { useLocalization } from '@/hooks/use-localization';
+import { formatBusinessDate, message as msg, type Message } from '@/localization';
+import { AppError, errorMessage } from '@/localization/errors';
 import { updateExcelWorkbook } from '@/services/excelService';
 import { downloadWorkbook, openWorkbook, pickExcelFile, shareWorkbook } from '@/services/fileService';
 import { parseSalesMessage } from '@/services/parserService';
@@ -14,7 +18,7 @@ import { AppState } from '@/types/sales';
 
 const initialState: AppState = {
   selectedFile: null, pastedMessage: '', parsedMessage: null,
-  statusMessage: 'Select a workbook to begin.', statusStep: null,
+  statusMessage: msg('status.selectWorkbook'), statusStep: null,
   errorMessage: null, successMessage: null, isLoading: false, updateResult: null,
 };
 
@@ -27,6 +31,7 @@ export default function HomeScreen() {
   const [pendingReminder, setPendingReminder] = useState(false);
   const [updatedAt, setUpdatedAt] = useState<number | null>(null);
   const { colors } = useAppTheme();
+  const { t, resolve, textStyle } = useLocalization();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { width } = useWindowDimensions();
   const wide = width >= 900;
@@ -36,8 +41,8 @@ export default function HomeScreen() {
     current.current = { ...current.current, ...patch };
     setState(current.current);
   }
-  function reportError(title: string, error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+  function reportError(title: Message, error: unknown) {
+    const message = errorMessage(error);
     change({ errorMessage: message, successMessage: null, statusMessage: title });
     setAlert({ kind: 'error', title, message });
   }
@@ -51,14 +56,14 @@ export default function HomeScreen() {
         if (!saved) return;
         await validateWorkbookFile(saved.uri);
         if (!active) return;
-        current.current = { ...current.current, selectedFile: saved, statusMessage: 'Saved workbook ready.' };
+        current.current = { ...current.current, selectedFile: saved, statusMessage: msg('status.savedReady') };
         setState(current.current);
         setUpdatedAt(saved.updatedTimestamp);
         const now = new Date();
         const confirmed = saved.confirmedTimestamp ? new Date(saved.confirmedTimestamp) : now;
         setPendingReminder(now.getMonth() !== confirmed.getMonth() || now.getFullYear() !== confirmed.getFullYear() || now.getTime() - confirmed.getTime() >= 25 * 86400000);
       } catch (error) {
-        if (active) setAlert({ kind: 'warning', title: 'Workbook unavailable', message: `${error instanceof Error ? error.message : String(error)} Your saved workbook has been kept. You can retry or select a replacement.` });
+        if (active) setAlert({ kind: 'warning', title: msg('alerts.workbookUnavailable'), message: msg('alerts.workbookKept', { reason: errorMessage(error) }) });
       } finally {
         if (active) setStorageLoading(false);
       }
@@ -66,7 +71,7 @@ export default function HomeScreen() {
     return () => { active = false; };
   }, []);
 
-  async function runAction(title: string, action: () => Promise<void>) {
+  async function runAction(title: Message, action: () => Promise<void>) {
     if (storageLoading || !lock.current.acquire()) return;
     change({ isLoading: true, errorMessage: null });
     try { await action(); }
@@ -75,17 +80,17 @@ export default function HomeScreen() {
   }
 
   async function selectWorkbook() {
-    await runAction('Workbook selection failed', async () => {
+    await runAction(msg('alerts.selectionFailed'), async () => {
       const saved = await chooseReplacement(pickExcelFile, file => replacePersistedWorkbook({ ...file, confirmedTimestamp: Date.now(), updatedTimestamp: null }));
       if (!saved) return;
-      change({ selectedFile: saved, updateResult: null, successMessage: null, statusMessage: `Selected ${saved.name}` });
+      change({ selectedFile: saved, updateResult: null, successMessage: null, statusMessage: msg('status.selected', { name: saved.name }) });
       setUpdatedAt(saved.updatedTimestamp);
       setPendingReminder(false);
     });
   }
   function requestWorkbookChange() {
     if (current.current.isLoading || storageLoading) return;
-    setAlert({ kind: 'confirmation', title: 'Change workbook?', message: 'Choose a new Excel workbook. Your current workbook stays saved until the replacement is ready.', confirmLabel: 'Choose workbook', cancelLabel: 'Cancel', onConfirm: () => { void selectWorkbook(); } });
+    setAlert({ kind: 'confirmation', title: msg('alerts.changeTitle'), message: msg('alerts.changeBody'), confirmLabel: msg('alerts.chooseWorkbook'), cancelLabel: msg('common.cancel'), onConfirm: () => { void selectWorkbook(); } });
   }
   function editMessage(message: string) {
     if (current.current.isLoading) return;
@@ -95,94 +100,97 @@ export default function HomeScreen() {
   function parseMessage() {
     if (current.current.isLoading || storageLoading) return;
     try {
-      change({ parsedMessage: parseSalesMessage(current.current.pastedMessage), errorMessage: null, successMessage: null, statusMessage: 'Message parsed. Review the values before updating.' });
-    } catch (error) { change({ parsedMessage: null }); reportError('Could not parse message', error); }
+      change({ parsedMessage: parseSalesMessage(current.current.pastedMessage), errorMessage: null, successMessage: null, statusMessage: msg('status.parsed') });
+    } catch (error) { change({ parsedMessage: null }); reportError(msg('alerts.parseFailed'), error); }
   }
   async function updateExcel() {
     if (!canUpdateSales(current.current)) return;
     const parsed = current.current.parsedMessage!;
-    await runAction('Update failed', async () => {
+    await runAction(msg('alerts.updateFailed'), async () => {
       const saved = await getPersistedWorkbook();
-      if (!saved) throw new Error('No saved workbook. Please select a workbook.');
+      if (!saved) throw new AppError('errors.noSavedWorkbook');
       const result = await updateExcelWorkbook({ uri: saved.uri, fileName: saved.name, parsed, onStatus: statusStep => change({ statusStep }) });
-      change({ statusStep: 'Saving validated workbook…' });
+      change({ statusStep: msg('status.saving') });
       const replacement = await replacePersistedWorkbook({ uri: result.outputUri, name: result.fileName, updatedTimestamp: Date.now() });
-      change({ selectedFile: replacement, updateResult: { ...result, outputUri: replacement.uri }, statusMessage: 'Workbook updated and saved.', successMessage: 'Excel updated successfully.' });
+      change({ selectedFile: replacement, updateResult: { ...result, outputUri: replacement.uri }, statusMessage: msg('status.saved'), successMessage: msg('status.success') });
       setUpdatedAt(replacement.updatedTimestamp);
-      setAlert({ kind: 'success', title: 'Excel updated!', message: 'Your updated workbook is saved and ready to use.', confirmLabel: 'OK' });
+      setAlert({ kind: 'success', title: msg('alerts.updatedTitle'), message: msg('alerts.updatedBody'), confirmLabel: msg('common.ok') });
     });
   }
   async function fileAction(action: 'open' | 'share' | 'export') {
     const file = current.current.selectedFile;
     if (!file) return;
-    await runAction(`Could not ${action} workbook`, async () => {
-      if (action === 'open') await openWorkbook(file.uri);
-      if (action === 'share') await shareWorkbook(file.uri, file.name);
+    const failureKeys = { open: 'alerts.openFailed', share: 'alerts.shareFailed', export: 'alerts.exportFailed' } as const;
+    const shareTitle = t('alerts.shareTitle', { name: file.name });
+    await runAction(msg(failureKeys[action]), async () => {
+      if (action === 'open') await openWorkbook(file.uri, shareTitle);
+      if (action === 'share') await shareWorkbook(file.uri, file.name, shareTitle);
       if (action === 'export') {
-        const outcome = await downloadWorkbook(file.uri, file.name);
-        if (outcome === 'saved') setAlert({ kind: 'success', title: 'Workbook exported', message: `${file.name} was saved to your selected folder.` });
+        const outcome = await downloadWorkbook(file.uri, file.name, shareTitle);
+        if (outcome === 'saved') setAlert({ kind: 'success', title: msg('alerts.exportedTitle'), message: msg('alerts.exportedBody', { name: file.name }) });
       }
     });
   }
   async function continueWorkbook() {
-    await runAction('Could not confirm workbook', async () => {
+    await runAction(msg('alerts.confirmFailed'), async () => {
       const saved = await getPersistedWorkbook();
-      if (!saved) throw new Error('Please select a workbook first.');
+      if (!saved) throw new AppError('errors.selectWorkbookFirst');
       await savePersistedWorkbook({ ...saved, confirmedTimestamp: Date.now() });
       setPendingReminder(false);
     });
   }
   async function testServer() {
-    await runAction('Connection failed', async () => {
+    await runAction(msg('alerts.connectionFailed'), async () => {
       const response = await fetch(`${SERVER_URL}/`);
-      if (!response.ok) throw new Error(`Server returned HTTP ${response.status}.`);
-      setAlert({ kind: 'success', title: 'Server connected', message: await response.text() });
+      if (!response.ok) throw new AppError('errors.serverStatus', { status: response.status });
+      await response.text();
+      setAlert({ kind: 'success', title: msg('alerts.connectedTitle'), message: msg('alerts.connectedBody') });
     });
   }
 
   return <>
-    <AppShell title={APP_TITLE} subtitle={APP_SUBTITLE}>
-      {Platform.OS === 'web' && <Text style={styles.notice}>Use the Android or iOS app to select, update, and export workbooks.</Text>}
+    <AppShell title={APP_TITLE} subtitle={t('sales.subtitle')}>
+      {Platform.OS === 'web' && <Text style={styles.notice}>{t('sales.nativeOnly')}</Text>}
       <View style={[styles.workflow, wide && styles.workflowWide]}>
         <View style={styles.main}>
           <ActionCard>
-            <WorkflowStep number={1} title="Choose your workbook" description="Keep one saved workbook ready for daily sales." />
-            <Text style={styles.fileName}>{storageLoading ? 'Loading saved workbook…' : state.selectedFile?.name ?? 'No workbook selected'}</Text>
-            <Text style={styles.muted}>Last updated: {updatedAt ? new Date(updatedAt).toLocaleString() : 'Never updated'}</Text>
+            <WorkflowStep number={1} title={t('sales.chooseTitle')} description={t('sales.chooseDescription')} />
+            <Text business={!storageLoading && !!state.selectedFile} style={styles.fileName}>{storageLoading ? t('sales.loadingWorkbook') : state.selectedFile?.name ?? t('sales.noWorkbook')}</Text>
+            <Text style={styles.muted}>{t('sales.lastUpdated', { date: updatedAt ? formatBusinessDate(updatedAt) : msg('sales.neverUpdated') })}</Text>
             {pendingReminder && <View style={styles.reminder}>
-              <Text style={styles.notice}>A new monthly workbook may be available.</Text>
-              <SecondaryButton title="Continue current workbook" disabled={disabled} onPress={() => { void continueWorkbook(); }} />
+              <Text style={styles.notice}>{t('sales.monthlyReminder')}</Text>
+              <SecondaryButton title={t('sales.continueWorkbook')} disabled={disabled} onPress={() => { void continueWorkbook(); }} />
             </View>}
             {state.selectedFile ? <>
               <View style={styles.fileActions}>
-                <View style={styles.action}><SecondaryButton title="Open" disabled={disabled} onPress={() => { void fileAction('open'); }} /></View>
-                <View style={styles.action}><SecondaryButton title="Share" disabled={disabled} onPress={() => { void fileAction('share'); }} /></View>
-                <View style={styles.action}><SecondaryButton title="Export" disabled={disabled} onPress={() => { void fileAction('export'); }} /></View>
+                <View style={styles.action}><SecondaryButton title={t('sales.open')} disabled={disabled} onPress={() => { void fileAction('open'); }} /></View>
+                <View style={styles.action}><SecondaryButton title={t('sales.share')} disabled={disabled} onPress={() => { void fileAction('share'); }} /></View>
+                <View style={styles.action}><SecondaryButton title={t('sales.export')} disabled={disabled} onPress={() => { void fileAction('export'); }} /></View>
               </View>
-              <SecondaryButton title="Change workbook" disabled={disabled} onPress={requestWorkbookChange} />
-            </> : <PrimaryButton title="Select Excel file" disabled={disabled || Platform.OS === 'web'} onPress={() => { void selectWorkbook(); }} />}
+              <SecondaryButton title={t('sales.changeWorkbook')} disabled={disabled} onPress={requestWorkbookChange} />
+            </> : <PrimaryButton title={t('sales.selectFile')} disabled={disabled || Platform.OS === 'web'} onPress={() => { void selectWorkbook(); }} />}
           </ActionCard>
           <ActionCard>
-            <WorkflowStep number={2} title="Paste and parse sales" description="Paste your WhatsApp message, then review the extracted values." />
-            <TextInput accessibilityLabel="Sales message" style={styles.textArea} multiline value={state.pastedMessage} onChangeText={editMessage} placeholder="Paste WhatsApp sales message here" placeholderTextColor={colors.textMuted} textAlignVertical="top" editable={!disabled} />
+            <WorkflowStep number={2} title={t('sales.pasteTitle')} description={t('sales.pasteDescription')} />
+            <TextInput accessibilityLabel={t('sales.messageLabel')} style={[styles.textArea, state.pastedMessage ? { writingDirection: 'auto', textAlign: 'auto' } : textStyle]} multiline value={state.pastedMessage} onChangeText={editMessage} placeholder={t('sales.messagePlaceholder')} placeholderTextColor={colors.textMuted} textAlignVertical="top" editable={!disabled} />
             <View style={styles.fileActions}>
-              <View style={styles.action}><PrimaryButton title="Parse message" disabled={disabled || !state.pastedMessage.trim()} onPress={parseMessage} /></View>
-              <View style={styles.action}><SecondaryButton title="Clear message" disabled={disabled || !state.pastedMessage} onPress={() => editMessage('')} /></View>
+              <View style={styles.action}><PrimaryButton title={t('sales.parse')} disabled={disabled || !state.pastedMessage.trim()} onPress={parseMessage} /></View>
+              <View style={styles.action}><SecondaryButton title={t('sales.clear')} disabled={disabled || !state.pastedMessage} onPress={() => editMessage('')} /></View>
             </View>
           </ActionCard>
         </View>
         <View style={[styles.review, wide && styles.reviewWide]}>
           <ActionCard>
-            <WorkflowStep number={3} title="Review and update" description="Update Excel when the workbook and parsed sales are ready." />
+            <WorkflowStep number={3} title={t('sales.reviewTitle')} description={t('sales.reviewDescription')} />
             {([
-              ['Date', state.parsedMessage?.date ?? '—'], ['DSF', state.parsedMessage?.dsf ?? '—'], ["Today's value", state.parsedMessage ? String(state.parsedMessage.todayValue) : '—'],
-            ]).map(([label, value]) => <View key={label} style={styles.valueRow}><Text style={styles.muted}>{label}</Text><Text style={styles.value}>{value}</Text></View>)}
-            {!state.parsedMessage && <Text style={styles.muted}>Parse the message after every edit or clear.</Text>}
-            <PrimaryButton title={state.isLoading ? 'Please wait…' : 'Update Excel'} disabled={disabled || !canUpdateSales(state) || Platform.OS === 'web'} onPress={() => { void updateExcel(); }} />
-            <Text accessibilityLiveRegion="polite" style={styles.status}>{state.statusStep ?? state.statusMessage}</Text>
-            {state.errorMessage && <Text style={styles.error}>{state.errorMessage}</Text>}
-            {state.successMessage && <Text style={styles.success}>{state.successMessage}</Text>}
-            <SecondaryButton title="Test server connection" disabled={disabled} onPress={() => { void testServer(); }} />
+              [t('sales.date'), state.parsedMessage?.date ?? '—'], [t('sales.dsf'), state.parsedMessage?.dsf ?? '—'], [t('sales.todayValue'), state.parsedMessage ? String(state.parsedMessage.todayValue) : '—'],
+            ]).map(([label, value]) => <View key={label} style={styles.valueRow}><Text style={styles.muted}>{label}</Text><Text business style={styles.value}>{value}</Text></View>)}
+            {!state.parsedMessage && <Text style={styles.muted}>{t('sales.reparse')}</Text>}
+            <PrimaryButton title={t(state.isLoading ? 'common.pleaseWait' : 'sales.update')} disabled={disabled || !canUpdateSales(state) || Platform.OS === 'web'} onPress={() => { void updateExcel(); }} />
+            <Text accessibilityLiveRegion="polite" style={styles.status}>{resolve(state.statusStep ?? state.statusMessage)}</Text>
+            {state.errorMessage && <Text style={styles.error}>{resolve(state.errorMessage)}</Text>}
+            {state.successMessage && <Text style={styles.success}>{resolve(state.successMessage)}</Text>}
+            <SecondaryButton title={t('sales.testConnection')} disabled={disabled} onPress={() => { void testServer(); }} />
           </ActionCard>
         </View>
       </View>

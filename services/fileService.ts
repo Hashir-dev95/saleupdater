@@ -1,3 +1,5 @@
+import { AppError } from '@/localization/errors';
+import { createLocalizer } from '@/localization';
 import { SelectedExcelFile } from '@/types/sales';
 import * as DocumentPicker from 'expo-document-picker';
 import { File as ExpoFile } from 'expo-file-system';
@@ -14,7 +16,7 @@ export async function ensureLocalUri(uri: string): Promise<string> {
     await validateWorkbookFile(uri);
     return uri;
   }
-  if (!FileSystem.cacheDirectory) throw new Error('Workbook caching is unavailable.');
+  if (!FileSystem.cacheDirectory) throw new AppError('errors.cachingUnavailable');
   const target = FileSystem.cacheDirectory + uniqueWorkbookName();
   try {
     await downloadValidatedWorkbook(uri, target);
@@ -30,7 +32,7 @@ export async function pickExcelFile(): Promise<SelectedExcelFile | null> {
   const result = await DocumentPicker.getDocumentAsync({ type: [XLSX_MIME], copyToCacheDirectory: true, multiple: false });
   if (result.canceled) return null;
   const asset = result.assets?.[0];
-  if (!asset?.uri) throw new Error('The picker did not provide a workbook file.');
+  if (!asset?.uri) throw new AppError('errors.pickerMissingFile');
   return { uri: asset.uri, name: asset.name ?? 'Workbook.xlsx', mimeType: asset.mimeType ?? XLSX_MIME, size: asset.size };
 }
 
@@ -38,31 +40,31 @@ export async function saveBase64ToUri(base64: string, uri: string): Promise<void
   new ExpoFile(uri).write(base64, { encoding: 'base64' });
 }
 
-export async function shareWorkbook(uri: string, fileName: string): Promise<void> {
-  if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is not available on this device.');
+export async function shareWorkbook(uri: string, fileName: string, dialogTitle = createLocalizer('en').t('alerts.shareTitle', { name: fileName })): Promise<void> {
+  if (!(await Sharing.isAvailableAsync())) throw new AppError('errors.sharingUnavailable');
   const localUri = await ensureLocalUri(uri);
-  await Sharing.shareAsync(localUri, { mimeType: XLSX_MIME, UTI: 'org.openxmlformats.spreadsheetml.sheet', dialogTitle: `Share ${fileName}` });
+  await Sharing.shareAsync(localUri, { mimeType: XLSX_MIME, UTI: 'org.openxmlformats.spreadsheetml.sheet', dialogTitle });
 }
 
-export async function openWorkbook(uri: string): Promise<void> {
+export async function openWorkbook(uri: string, shareTitle?: string): Promise<void> {
   if (Platform.OS === 'ios') {
     // iOS uses its document share sheet, including compatible Excel apps.
-    await shareWorkbook(uri, 'Workbook.xlsx');
+    await shareWorkbook(uri, 'Workbook.xlsx', shareTitle);
     return;
   }
-  if (Platform.OS !== 'android') throw new Error('Opening local workbooks requires the Android or iOS app.');
+  if (Platform.OS !== 'android') throw new AppError('errors.openNativeOnly');
   let target = await ensureLocalUri(uri);
   if (target.startsWith('file://')) target = await FileSystem.getContentUriAsync(target);
   await IntentLauncher.startActivityAsync('android.intent.action.VIEW', { data: target, flags: 1, type: XLSX_MIME });
 }
 
-export async function downloadWorkbook(uri: string, fileName: string): Promise<'saved' | 'canceled' | 'shared'> {
+export async function downloadWorkbook(uri: string, fileName: string, shareTitle?: string): Promise<'saved' | 'canceled' | 'shared'> {
   if (Platform.OS === 'ios') {
     // The share sheet offers Save to Files; its completion does not prove a save.
-    await shareWorkbook(uri, fileName);
+    await shareWorkbook(uri, fileName, shareTitle);
     return 'shared';
   }
-  if (Platform.OS !== 'android') throw new Error('Exporting local workbooks requires the Android or iOS app.');
+  if (Platform.OS !== 'android') throw new AppError('errors.exportNativeOnly');
   const permission = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
   if (!permission.granted) return 'canceled';
   const localUri = await ensureLocalUri(uri);

@@ -27,10 +27,12 @@ export interface AppState {
   selectedFile: SelectedExcelFile | null;
   pastedMessage: string;
   parsedMessage: ParsedSalesMessage | null;
-  statusMessage: string;
-  statusStep: string | null;
-  errorMessage: string | null;
-  successMessage: string | null;
+  statusMessage: Message;
+  statusStep: Message | null;
+  errorMessage: Message | null;
+  successMessage: Message | null;
   isLoading: boolean;
   updateResult: ExcelUpdateResult | null;
 }
+import type { Message } from '@/localization';
+

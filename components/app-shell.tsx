@@ -1,12 +1,16 @@
 import { router } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Modal, Pressable, ScrollView, StyleSheet, Switch, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppThemeColors } from '@/constants/app-theme';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { useLocalization } from '@/hooks/use-localization';
+import { LanguageSwitch } from '@/components/language-switch';
+import { LocalizedText as Text } from '@/components/localized-text';
 
 export function AppShell({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
+  const { t } = useLocalization();
   const { width } = useWindowDimensions();
   const { colors } = useAppTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -16,11 +20,11 @@ export function AppShell({ title, subtitle, children }: { title: string; subtitl
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[styles.content, { paddingHorizontal: width < 600 ? 16 : 32 }]} showsVerticalScrollIndicator={false}>
       <View style={styles.header}>
         <View style={styles.headingCopy}>
-          <Text style={styles.title}>{title}</Text>
+          <Text business style={styles.title}>{title}</Text>
           {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
         </View>
         <Pressable
-          accessibilityLabel="Open menu"
+          accessibilityLabel={t('drawer.open')}
           accessibilityRole="button"
           hitSlop={8}
           onPress={() => setDrawerOpen(true)}
@@ -60,6 +64,7 @@ export function SecondaryButton(props: ButtonProps) { return <Button {...props} 
 
 function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { colors, isDark, setMode } = useAppTheme();
+  const { t, language, setLanguage, saveError } = useLocalization();
   const { width } = useWindowDimensions();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const translateX = useRef(new Animated.Value(Math.min(width * 0.86, 360))).current;
@@ -79,24 +84,32 @@ function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () => void
 
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={() => close()} statusBarTranslucent>
     <View style={styles.drawerOverlay}>
-      <Pressable accessibilityLabel="Close menu" style={StyleSheet.absoluteFill} onPress={() => close()} />
+      <Pressable accessibilityLabel={t('drawer.close')} style={StyleSheet.absoluteFill} onPress={() => close()} />
       <Animated.View style={[styles.drawer, { width: Math.min(width * 0.86, 360), transform: [{ translateX }] }]}>
         <SafeAreaView style={styles.drawerSafeArea}>
+          <ScrollView contentContainerStyle={styles.drawerContent}>
           <View style={styles.drawerHeader}>
-            <View>
-              <Text accessibilityRole="header" style={styles.drawerTitle}>Menu</Text>
-              <Text style={styles.drawerSubtitle}>Sales Updater</Text>
+            <View style={styles.drawerHeading}>
+              <Text accessibilityRole="header" style={styles.drawerTitle}>{t('drawer.menu')}</Text>
+              <Text style={styles.drawerSubtitle}>{t('drawer.appName')}</Text>
             </View>
-            <Pressable accessibilityLabel="Close menu" accessibilityRole="button" onPress={() => close()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-              <Text style={styles.closeText}>{'\u00d7'}</Text>
-            </Pressable>
+            <View style={styles.drawerHeaderControls}>
+              <LanguageSwitch />
+              <Pressable accessibilityLabel={t('drawer.close')} accessibilityRole="button" onPress={() => close()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+                <Text style={styles.closeText}>{'\u00d7'}</Text>
+              </Pressable>
+            </View>
           </View>
+          {saveError && <View style={styles.languageError}>
+            <Text accessibilityLiveRegion="polite" style={{ color: colors.error }}>{t('language.saveFailed')}</Text>
+            <SecondaryButton title={t('common.retry')} onPress={() => { void setLanguage(language); }} />
+          </View>}
 
           <Pressable accessibilityRole="button" onPress={() => close(() => router.replace('/'))} style={({ pressed }) => [styles.drawerRow, pressed && styles.drawerRowPressed]}>
             <View style={styles.homeIcon}><Text style={styles.homeIconText}>{'\u2302'}</Text></View>
             <View style={styles.drawerRowCopy}>
-              <Text style={styles.drawerRowTitle}>Dashboard</Text>
-              <Text style={styles.drawerRowSubtitle}>Back to home</Text>
+              <Text style={styles.drawerRowTitle}>{t('drawer.dashboard')}</Text>
+              <Text style={styles.drawerRowSubtitle}>{t('drawer.home')}</Text>
             </View>
             <Text style={styles.chevron}>{'\u203a'}</Text>
           </Pressable>
@@ -105,17 +118,18 @@ function AppDrawer({ visible, onClose }: { visible: boolean; onClose: () => void
           <View style={styles.drawerRow}>
             <View style={styles.themeIcon}><Text style={styles.themeIconText}>{isDark ? '\u263e' : '\u2600'}</Text></View>
             <View style={styles.drawerRowCopy}>
-              <Text style={styles.drawerRowTitle}>Dark mode</Text>
-              <Text style={styles.drawerRowSubtitle}>{isDark ? 'On' : 'Off'}</Text>
+              <Text style={styles.drawerRowTitle}>{t('drawer.darkMode')}</Text>
+              <Text style={styles.drawerRowSubtitle}>{t(isDark ? 'common.on' : 'common.off')}</Text>
             </View>
             <Switch
-              accessibilityLabel="Dark mode"
+              accessibilityLabel={t('drawer.darkMode')}
               value={isDark}
               onValueChange={enabled => setMode(enabled ? 'dark' : 'light')}
               trackColor={{ false: colors.border, true: colors.primary }}
               thumbColor={isDark ? '#ffffff' : '#f8fafc'}
             />
           </View>
+          </ScrollView>
         </SafeAreaView>
       </Animated.View>
     </View>
@@ -140,7 +154,11 @@ const createStyles = (colors: AppThemeColors) => StyleSheet.create({
   drawerOverlay: { flex: 1, backgroundColor: colors.overlay, alignItems: 'flex-end' },
   drawer: { height: '100%', maxWidth: 360, backgroundColor: colors.surface, shadowColor: '#000000', shadowOpacity: 0.3, shadowRadius: 18, shadowOffset: { width: -6, height: 0 }, elevation: 18 },
   drawerSafeArea: { flex: 1, paddingHorizontal: 18, paddingTop: 8 },
-  drawerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 18 },
+  drawerContent: { paddingBottom: 20 },
+  drawerHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8, paddingVertical: 18 },
+  drawerHeading: { flex: 1, minWidth: 0 },
+  drawerHeaderControls: { alignItems: 'flex-end', gap: 8, flexShrink: 0 },
+  languageError: { gap: 8, marginBottom: 12 },
   drawerTitle: { color: colors.text, fontSize: 26, fontWeight: '800' },
   drawerSubtitle: { color: colors.textMuted, fontSize: 14, marginTop: 3 },
   closeButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceMuted },

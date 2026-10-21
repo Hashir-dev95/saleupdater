@@ -1,5 +1,4 @@
 export const APP_TITLE = 'Tso AKHTAR HUSSAIN';
-export const APP_SUBTITLE = 'Automate daily Excel updates from WhatsApp sales messages.';
 export const SERVER_URL = 'https://excel-server-is2r.onrender.com';
 export const SAMPLE_MESSAGE = `*12.07.2026*
 *Dsf* : M.Yaseen

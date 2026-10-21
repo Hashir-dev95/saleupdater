@@ -1,3 +1,4 @@
+import { AppError } from '@/localization/errors';
 import { ParsedSalesMessage } from '@/types/sales';
 
 const DATE_PATTERN = /\b(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})\b/i;
@@ -9,7 +10,7 @@ export function parseSalesMessage(message: string): ParsedSalesMessage {
   const normalizedMessage = normalizeMessage(message);
 
   if (!normalizedMessage) {
-    throw new Error('Invalid WhatsApp message');
+    throw new AppError('errors.invalidMessage');
   }
 
   const dateMatch = normalizedMessage.match(DATE_PATTERN);
@@ -17,7 +18,7 @@ export function parseSalesMessage(message: string): ParsedSalesMessage {
   const todayValueMatch = normalizedMessage.match(TODAY_VALUE_PATTERN);
 
   if (!dsfMatch?.[1] || !todayValueMatch?.[1]) {
-    throw new Error('Invalid WhatsApp message');
+    throw new AppError('errors.invalidMessage');
   }
 
   const date = dateMatch?.[1]?.trim() || getTodayDateString();
@@ -26,7 +27,7 @@ export function parseSalesMessage(message: string): ParsedSalesMessage {
   const todayValue = Number(rawTodayValue);
 
   if (!date || !dsf || Number.isNaN(todayValue) || todayValue <= 0) {
-    throw new Error('Invalid WhatsApp message');
+    throw new AppError('errors.invalidMessage');
   }
 
   return {

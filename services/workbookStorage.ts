@@ -1,3 +1,4 @@
+import { AppError } from '@/localization/errors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Buffer } from 'buffer';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -20,7 +21,7 @@ export function validateExcelContents(base64: string): void {
   const bytes = Buffer.from(base64, 'base64');
   // SheetJS also accepts HTML/CSV/plain text. Require an actual XLSX container.
   if (bytes.length < 4 || bytes[0] !== 0x50 || bytes[1] !== 0x4b || bytes[2] !== 3 || bytes[3] !== 4) {
-    throw new Error('The file is not a valid Excel (.xlsx) workbook.');
+    throw new AppError('errors.invalidWorkbook');
   }
   try {
     const workbook = XLSX.read(base64, { type: 'base64', bookFiles: true });
@@ -28,19 +29,19 @@ export function validateExcelContents(base64: string): void {
     if (!keys?.includes('xl/workbook.xml') || !workbook.SheetNames.length ||
       workbook.SheetNames.some(name => !workbook.Sheets[name])) throw new Error('Missing workbook sheets');
   } catch {
-    throw new Error('The file is not a valid Excel (.xlsx) workbook.');
+    throw new AppError('errors.invalidWorkbook');
   }
 }
 
 export async function validateWorkbookFile(uri: string): Promise<void> {
   const info = await FileSystem.getInfoAsync(uri);
-  if (!info.exists || info.isDirectory || info.size === 0) throw new Error('Workbook file is missing or empty.');
+  if (!info.exists || info.isDirectory || info.size === 0) throw new AppError('errors.missingWorkbook');
   validateExcelContents(await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 }));
 }
 
 export async function downloadValidatedWorkbook(source: string, target: string): Promise<void> {
   const result = await FileSystem.downloadAsync(source, target);
-  if (!Number.isInteger(result.status) || result.status < 200 || result.status >= 300) throw new Error(`Workbook download failed (HTTP ${result.status}).`);
+  if (!Number.isInteger(result.status) || result.status < 200 || result.status >= 300) throw new AppError('errors.downloadFailed', { status: result.status });
   await validateWorkbookFile(target);
 }
 
@@ -54,7 +55,7 @@ export async function getPersistedWorkbook(): Promise<SavedWorkbook | null> {
   if (record !== null) {
     const saved = JSON.parse(record);
     if (!saved || typeof saved.uri !== 'string' || !saved.uri || typeof saved.name !== 'string' || !saved.name) {
-      throw new Error('Saved workbook metadata is invalid. Please select a workbook.');
+      throw new AppError('errors.invalidMetadata');
     }
     return { uri: saved.uri, name: saved.name, confirmedTimestamp: timestamp(saved.confirmedTimestamp), updatedTimestamp: timestamp(saved.updatedTimestamp) };
   }
@@ -80,11 +81,11 @@ async function removeManagedCopy(uri: string): Promise<void> {
 export async function replacePersistedWorkbook(params: {
   uri: string; name: string; confirmedTimestamp?: number | null; updatedTimestamp?: number | null;
 }): Promise<SavedWorkbook> {
-  if (!FileSystem.documentDirectory) throw new Error('Workbook storage is unavailable on this platform.');
+  if (!FileSystem.documentDirectory) throw new AppError('errors.storageUnavailable');
   const previous = await getPersistedWorkbook();
   const target = FileSystem.documentDirectory + uniqueWorkbookName();
   // Never overwrite an existing copy, including after a clock reset or restart.
-  if ((await FileSystem.getInfoAsync(target)).exists) throw new Error('Could not allocate a new workbook file. Please retry.');
+  if ((await FileSystem.getInfoAsync(target)).exists) throw new AppError('errors.allocationFailed');
   try {
     if (/^https?:\/\//i.test(params.uri)) await downloadValidatedWorkbook(params.uri, target);
     else {

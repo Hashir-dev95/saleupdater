@@ -4,6 +4,11 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 ## Get started
 
+This project uses **Expo SDK 54**. On Android, install the
+[matching Expo Go for SDK 54](https://expo.dev/go?sdkVersion=54&platform=android&device=true).
+Expo Go for SDK 57 cannot open this project. If Android refuses to install the
+older version, uninstall the newer Expo Go first, then install the SDK 54 version.
+
 1. Install dependencies
 
    ```bash
@@ -13,8 +18,12 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 2. Start the app
 
    ```bash
-   npx expo start
+   npm start
    ```
+
+Run these commands from `D:\Excelapp\SalesUpdater`. The start command uses this
+project's local Expo SDK 54, opens Expo Go, and clears Metro's cache. Stop any
+previous Expo server with `Ctrl+C`, then scan the new QR code in Expo Go.
 
 In the output, you'll find options to open the app in a
 
