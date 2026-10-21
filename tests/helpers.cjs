@@ -19,7 +19,7 @@ function loader(mocks = {}) {
       if (Object.hasOwn(mocks, name)) return mocks[name];
       if (name.startsWith('@/') || name.startsWith('.')) {
         const base = name.startsWith('@/') ? path.join(root, name.slice(2)) : path.resolve(path.dirname(absolute), name);
-        const target = [base, base + '.ts', base + '.tsx'].find(p => fs.existsSync(p));
+        const target = [base, base + '.ts', base + '.tsx', path.join(base, 'index.ts')].find(p => fs.existsSync(p) && fs.statSync(p).isFile());
         return load(target);
       }
       return require(name);
@@ -80,6 +80,8 @@ function fixture(options = {}) {
 }
 
 function screen(f) {
+  let language = 'en';
+  const localization = f.load('localization/index.ts');
   const slots = [];
   const effects = [];
   let cursor = 0;
@@ -91,6 +93,8 @@ function screen(f) {
   };
   const jsx = (type, props) => ({ type, props });
   const load = loader({ ...f.mocks, react,
+    '@/components/localized-text': { LocalizedText: 'Text' },
+    '@/hooks/use-localization': { useLocalization: () => localization.createLocalizer(language) },
     'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'Fragment' },
     '@/components/app-shell': Object.fromEntries(['ActionCard', 'AppShell', 'PrimaryButton', 'SecondaryButton', 'WorkflowStep'].map(name => [name, name])),
     '@/components/sweet-alert': { SweetAlert: 'SweetAlert' },
@@ -112,7 +116,15 @@ function screen(f) {
   render();
   effects.forEach(effect => effect());
   return {
-    render, find, state: () => slots[0], alert: () => find(node => node.type === 'SweetAlert').props.alert,
+    render, find, state: () => slots[0],
+    setLanguage: nextLanguage => { language = nextLanguage; },
+    alert: () => {
+      const alert = find(node => node.type === 'SweetAlert').props.alert;
+      if (!alert) return null;
+      const resolve = localization.createLocalizer(language).resolve;
+      return { ...alert, title: resolve(alert.title), message: resolve(alert.message),
+        confirmLabel: alert.confirmLabel && resolve(alert.confirmLabel), cancelLabel: alert.cancelLabel && resolve(alert.cancelLabel) };
+    },
     button: title => find(node => node.props?.title === title && /Button$/.test(node.type)),
     edit: message => find(node => node.type === 'TextInput').props.onChangeText(message),
     async settle() { for (let i = 0; i < 20; i++) await new Promise(resolve => setImmediate(resolve)); },

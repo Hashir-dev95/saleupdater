@@ -4,7 +4,7 @@
     "slug": "SalesUpdater",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/app-icon.png",
     "scheme": "salesupdater",
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#eef4f2",
@@ -14,15 +14,15 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0f172a",
-        "foregroundImage": "./assets/images/icon.png"
+        "backgroundColor": "#047857",
+        "foregroundImage": "./assets/images/app-icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.whomi.salesUpdater"
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/app-icon.png"
     },
     "plugins": [
       "expo-router",
